@@ -10,12 +10,12 @@
 [![PySide6](https://img.shields.io/badge/PySide6-6.x-41CD52?logo=qt&logoColor=white)](https://doc.qt.io/qtforpython/)
 [![Matplotlib](https://img.shields.io/badge/Matplotlib-3.x-11557C?logo=matplotlib&logoColor=white)](https://matplotlib.org/)
 [![3Dmol.js](https://img.shields.io/badge/3Dmol.js-2.x-1E90FF)](https://3dmol.csb.pitt.edu/)
-[![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11%20x64-0078D6?logo=windows&logoColor=white)](#-便携版下载)
+[![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11%20x64-0078D6?logo=windows&logoColor=white)](#-快速开始)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/moyulyy/plot_PDOS?label=Release&color=success)](https://github.com/moyulyy/plot_PDOS/releases)
 [![Stars](https://img.shields.io/github/stars/moyulyy/plot_PDOS?color=yellow)](https://github.com/moyulyy/plot_PDOS/stargazers)
 
-[功能](#-功能) · [界面预览](#-界面预览) · [快速开始](#-快速开始) · [数据目录](#-数据目录) · [算法](#-带中心band-center算法) · [打包](#-打包成便携程序包) · [常见问题](#-常见问题)
+[功能](#-功能) · [界面预览](#-界面预览) · [**⬇ 便携版下载**](https://github.com/moyulyy/plot_PDOS/releases/latest) · [快速开始](#-快速开始) · [数据目录](#-数据目录) · [算法](#-带中心band-center算法) · [打包](#-打包成便携程序包) · [常见问题](#-常见问题)
 
 </div>
 
