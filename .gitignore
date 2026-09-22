@@ -1,0 +1,40 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# ---- PyInstaller 构建产物 ----
+build/
+dist/
+*.manifest
+
+# ---- 运行期生成 / 临时文件 ----
+3dmol/_viewer.html
+*.log
+_out.txt
+_err.txt
+_smoke*.log
+_smoke*.png
+_shot_*.png
+_crop*.png
+_save_*.png
+*.tmp
+
+# ---- VASP 数据（体积大，不入库，请自行放置/选择路径）----
+test/
+Data-total/
+Data-element/
+Data-atom/
+CONTCAR
+POSCAR
+OUTCAR
+DOSCAR
+
+# ---- 系统 / 编辑器 ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
