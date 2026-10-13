@@ -669,6 +669,139 @@ def orbital_values(cols, orbital):
 
 
 # ==========================================================================
+# Excel 导出
+# ==========================================================================
+def _import_openpyxl():
+    """按需导入 openpyxl；未安装时返回 None（导出功能提示用户）。"""
+    try:
+        import openpyxl
+    except Exception:
+        return None
+    return openpyxl
+
+
+def _set_widths(ws, rows=1, min_width=9, max_width=24):
+    """按前若干行内容粗略设置列宽（仅表头/标题，避免大表遍历开销）。"""
+    from openpyxl.utils import get_column_letter
+    for row in ws.iter_rows(min_row=1, max_row=rows):
+        for cell in row:
+            if cell.value is None:
+                continue
+            letter = get_column_letter(cell.column)
+            length = len(str(cell.value))
+            cur = ws.column_dimensions[letter].width or 0
+            ws.column_dimensions[letter].width = min(
+                max(cur, length + 2, min_width), max_width)
+
+
+def write_curves_excel(path, page_title, series):
+    """把当前页面的每条曲线导出到 Excel 文件。
+
+    工作表「曲线信息」：每条曲线的名称、颜色、线型、线宽、填充、
+    透明度、数据点数以及带中心 ε；
+    工作表「曲线数据」：每条曲线占相邻两列（Energy、DOS），依次向右排列。
+    """
+    openpyxl = _import_openpyxl()
+    if openpyxl is None:
+        raise RuntimeError("未安装 openpyxl，无法导出 Excel。")
+    wb = openpyxl.Workbook()
+    info = wb.active
+    info.title = "曲线信息"
+    info.append(["页面", "序号", "曲线名称", "颜色", "线型", "线宽",
+                 "填充", "透明度", "数据点数", "带中心 ε (eV)"])
+    for i, s in enumerate(series, 1):
+        x = list(s.get("x") or [])
+        y = list(s.get("y") or [])
+        bc = band_center(x, y) if x and y else None
+        alpha = s.get("alpha")
+        info.append([
+            page_title, i, str(s.get("label", "")),
+            str(s.get("color", "")), str(s.get("ls", "-")),
+            s.get("lw", 1.4),
+            "是" if s.get("fill") else "否",
+            "" if alpha is None else float(alpha),
+            len(x),
+            "" if bc is None else round(bc, 6),
+        ])
+    _set_widths(info, rows=1, min_width=10, max_width=28)
+
+    data = wb.create_sheet("曲线数据")
+    col = 1
+    for s in series:
+        data.cell(row=1, column=col, value="Energy (eV)")
+        data.cell(row=1, column=col + 1, value=str(s.get("label", "")))
+        for r, (xi, yi) in enumerate(
+                zip(list(s.get("x") or []), list(s.get("y") or [])), start=2):
+            data.cell(row=r, column=col, value=float(xi))
+            data.cell(row=r, column=col + 1, value=float(yi))
+        col += 3          # 曲线之间空 1 列
+    data.freeze_panes = "A2"
+    _set_widths(data, rows=1, min_width=12, max_width=24)
+    wb.save(path)
+
+
+def write_tdos_elem_excel(path, tdos, elem_entries, elements):
+    """把 TDOS 以及 Data-element 下每个元素的 up / dn 导出到同一张工作表。
+
+    布局：每个文件的数据作为一个「块」，依次由左向右排列；
+    不同块（TDOS、各元素）之间空 2 列；
+    同一元素的 up / dn 两块紧挨在一起（中间不空列）。
+    """
+    openpyxl = _import_openpyxl()
+    if openpyxl is None:
+        raise RuntimeError("未安装 openpyxl，无法导出 Excel。")
+    groups = []
+    if tdos and tdos[0]:
+        cols = tdos[1]
+        order = [c for c in ("TDOS-UP", "TDOS-DOWN") if c in cols]
+        order += [c for c in cols if c not in order]
+        groups.append([("TDOS  (TDOS.dat)", tdos, order)])
+    for elem in elements:
+        entry = elem_entries.get(elem, {})
+        blocks = []
+        up = entry.get("up")
+        down = entry.get("down")
+        if up and up[0]:
+            blocks.append((f"{elem} ↑  (PDOS_EIG_UP_{elem}.dat)",
+                           up, list(up[1].keys())))
+        if down and down[0]:
+            blocks.append((f"{elem} ↓  (PDOS_EIG_DW_{elem}.dat)",
+                           down, list(down[1].keys())))
+        if blocks:
+            groups.append(blocks)
+    if not groups:
+        raise RuntimeError("没有可导出的 TDOS / 元素 PDOS 数据。")
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "TDOS-Element-PDOS"
+    col = 1
+    for gi, group in enumerate(groups):
+        for title, (energy, cols), order in group:
+            ncols = 1 + len(order)
+            ws.cell(row=1, column=col, value=title)
+            if ncols > 1:
+                ws.merge_cells(start_row=1, start_column=col,
+                               end_row=1, end_column=col + ncols - 1)
+            ws.cell(row=2, column=col, value="Energy (eV)")
+            for j, name in enumerate(order):
+                ws.cell(row=2, column=col + 1 + j, value=name)
+            for i, e_val in enumerate(energy):
+                row = 3 + i
+                ws.cell(row=row, column=col, value=float(e_val))
+                for j, name in enumerate(order):
+                    vals = cols.get(name) or []
+                    if i < len(vals):
+                        ws.cell(row=row, column=col + 1 + j,
+                                value=float(vals[i]))
+            col += ncols
+        if gi < len(groups) - 1:
+            col += 2          # 组（TDOS / 元素）之间空 2 列
+    ws.freeze_panes = "A3"
+    _set_widths(ws, rows=2, min_width=10, max_width=16)
+    wb.save(path)
+
+
+# ==========================================================================
 # 3D 结构视图（3Dmol.js）
 # ==========================================================================
 class StructureBridge(QObject):
@@ -1084,6 +1217,7 @@ class DosView(FigureCanvasQTAgg):
         self.setParent(parent)
         self.ax = self.figure.add_subplot(111)
         self._dark = False
+        self.series = []          # 最近一次绘制的曲线（供 Excel 导出使用）
 
     def set_theme(self, dark):
         self._dark = dark
@@ -1101,6 +1235,7 @@ class DosView(FigureCanvasQTAgg):
              title="", xlabel="Energy (eV)", ylabel="DOS (states/eV)",
              gap=0.0, vlines=None):
         self.ax.clear()
+        self.series = list(series or [])
         for s in series:
             self.ax.plot(s["x"], s["y"], color=s["color"],
                          lw=s.get("lw", 1.4), ls=s.get("ls", "-"),
@@ -1680,17 +1815,35 @@ class MainWindow(QWidget):
 
     # ---- 右栏参数容器 ----
     def _build_right_footer(self):
-        """右栏底部固定按钮：保存当前图片（仅 DOS 曲线类页面显示）。"""
+        """右栏底部固定按钮：保存图片 / 导出 Excel（仅 DOS 曲线类页面显示）。"""
         box = QWidget()
         box.setFixedWidth(336)
         lay = QVBoxLayout(box)
         lay.setContentsMargins(0, 6, 12, 12)
+        lay.setSpacing(6)
         self.btn_save_img = QPushButton("保存当前图片")
         self.btn_save_img.setObjectName("Secondary")
         self.btn_save_img.setCursor(Qt.PointingHandCursor)
         self.btn_save_img.setToolTip("把当前页面的曲线图保存为 300 dpi 图片")
         self.btn_save_img.clicked.connect(self._save_figure)
         lay.addWidget(self.btn_save_img)
+
+        self.btn_export_curves = QPushButton("导出曲线数据到 Excel")
+        self.btn_export_curves.setObjectName("Secondary")
+        self.btn_export_curves.setCursor(Qt.PointingHandCursor)
+        self.btn_export_curves.setToolTip(
+            "把当前页面每条曲线的数据与信息导出到 Excel 文件")
+        self.btn_export_curves.clicked.connect(self._export_curves_excel)
+        lay.addWidget(self.btn_export_curves)
+
+        self.btn_export_summary = QPushButton("导出 TDOS+元素汇总 (Excel)")
+        self.btn_export_summary.setObjectName("Secondary")
+        self.btn_export_summary.setCursor(Qt.PointingHandCursor)
+        self.btn_export_summary.setToolTip(
+            "把 TDOS 与 Data-element 下每个元素的 up / dn 数据导出到同一张表")
+        self.btn_export_summary.clicked.connect(self._export_tdos_elem_excel)
+        lay.addWidget(self.btn_export_summary)
+
         box.setVisible(False)
         return box
 
@@ -2953,6 +3106,66 @@ class MainWindow(QWidget):
             return
         self.status.setText(f"已保存图片：{Path(path).name}")
 
+    # ---- 导出 Excel ----
+    def _export_default_dir(self):
+        return self.data_root if self.data_root is not None else BASE_DIR
+
+    def _ask_save_xlsx(self, title, default_name):
+        """弹出保存对话框，返回带 .xlsx 扩展名的路径（取消时返回 None）。"""
+        default = str(Path(self._export_default_dir()) / default_name)
+        path, _ = QFileDialog.getSaveFileName(
+            self, title, default, "Excel 工作簿 (*.xlsx)")
+        if not path:
+            return None
+        if not Path(path).suffix:
+            path += ".xlsx"
+        return path
+
+    def _export_curves_excel(self):
+        """把当前页面每条曲线对应的信息/数据导出到 Excel。"""
+        series = list(getattr(self.dos_view, "series", []) or [])
+        if not series:
+            QMessageBox.information(
+                self, "无可导出的数据",
+                "当前页面还没有绘制曲线，请先加载数据。")
+            return
+        if _import_openpyxl() is None:
+            QMessageBox.warning(
+                self, "缺少依赖",
+                "导出 Excel 需要 openpyxl，请先安装：\n\npip install openpyxl")
+            return
+        title = self._dos_title(self._current_key)
+        stem = "_".join((title or "curves").split())
+        path = self._ask_save_xlsx("导出曲线数据到 Excel",
+                                   f"{stem}_曲线数据.xlsx")
+        if not path:
+            return
+        try:
+            write_curves_excel(path, title, series)
+        except Exception as exc:
+            QMessageBox.warning(self, "导出失败", str(exc))
+            return
+        self.status.setText(f"已导出曲线数据：{Path(path).name}")
+
+    def _export_tdos_elem_excel(self):
+        """把 TDOS 与 Data-element 下每个元素的 up / dn 导出到一张工作表。"""
+        if _import_openpyxl() is None:
+            QMessageBox.warning(
+                self, "缺少依赖",
+                "导出 Excel 需要 openpyxl，请先安装：\n\npip install openpyxl")
+            return
+        path = self._ask_save_xlsx("导出 TDOS+元素汇总到 Excel",
+                                   "TDOS_Element-PDOS_汇总.xlsx")
+        if not path:
+            return
+        try:
+            write_tdos_elem_excel(path, self._data.get("tdos"),
+                                  self._data.get("elem", {}), self._elements)
+        except Exception as exc:
+            QMessageBox.warning(self, "导出失败", str(exc))
+            return
+        self.status.setText(f"已导出 TDOS+元素汇总：{Path(path).name}")
+
     # ---- 自动特征识别（总态密度信息） ----
     @staticmethod
     def _detect_gap(e, tot, ymax):
@@ -3126,10 +3339,14 @@ class MainWindow(QWidget):
             self._right_gauss_param_card()
             self._right_gauss_smooth_card()
             self._right_gauss_export_card()
-        # 底部固定的「保存当前图片」按钮：只在有曲线图的页面出现
+        # 底部固定按钮：保存图片 / 导出 Excel
         if getattr(self, "right_footer", None) is not None:
-            self.right_footer.setVisible(
-                key in ("tdos", "element", "atom", "eorbit"))
+            curve_pages = ("tdos", "element", "atom", "eorbit")
+            show_footer = key in curve_pages or key == "gauss"
+            self.right_footer.setVisible(show_footer)
+            self.btn_save_img.setVisible(key in curve_pages)
+            self.btn_export_curves.setVisible(show_footer)
+            self.btn_export_summary.setVisible(key in ("tdos", "element"))
         self._install_wheel_guard()
 
     def _right_structure(self):

@@ -32,6 +32,11 @@ hiddenimports = [
     # matplotlib 的 Qt 后端
     "matplotlib.backends.backend_qtagg",
     "matplotlib.backends.backend_agg",
+    # Excel 导出
+    "openpyxl",
+    "openpyxl.styles",
+    "openpyxl.utils",
+    "et_xmlfile",
 ]
 
 a = Analysis(

@@ -10,6 +10,7 @@
 [![PySide6](https://img.shields.io/badge/PySide6-6.x-41CD52?logo=qt&logoColor=white)](https://doc.qt.io/qtforpython/)
 [![Matplotlib](https://img.shields.io/badge/Matplotlib-3.x-11557C?logo=matplotlib&logoColor=white)](https://matplotlib.org/)
 [![3Dmol.js](https://img.shields.io/badge/3Dmol.js-2.x-1E90FF)](https://3dmol.csb.pitt.edu/)
+[![openpyxl](https://img.shields.io/badge/openpyxl-3.x-217346?logo=microsoftexcel&logoColor=white)](https://openpyxl.readthedocs.io/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11%20x64-0078D6?logo=windows&logoColor=white)](#-快速开始)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/moyulyy/plot_PDOS?label=Release&color=success)](https://github.com/moyulyy/plot_PDOS/releases)
@@ -96,6 +97,21 @@
 - 指定**平滑列**与高斯 `σ`，一键「绘制」，同图叠加**原曲线**与**圆滑曲线**（带图例）
 - 可把圆滑结果导出为两列文本：`Energy(eV)` 与 `quasi_dos_sigma=<σ>`
 
+### 📊 导出 Excel（曲线数据）
+曲线页面（TDOS / 元素 PDOS / 原子-轨道-PDOS / 元素-轨道-PDOS / 高斯圆滑）的右栏右下角固定一个「导出曲线数据到 Excel」按钮：
+
+- 工作表 **曲线信息**：逐条列出页面、序号、曲线名称、颜色、线型、线宽、填充、透明度、数据点数与带中心 ε(eV)
+- 工作表 **曲线数据**：每条曲线占相邻两列（`Energy (eV)` 与 DOS），依次向右排列，曲线之间空 1 列
+
+### 📋 导出 TDOS + 元素汇总
+在 **TDOS / 元素 PDOS** 页还有一个「导出 TDOS+元素汇总 (Excel)」按钮，把 `Data-total/TDOS.dat` 与 `Data-element/` 下每个元素的 up / dn 数据放进**同一张工作表**：
+
+- 每个文件的数据作为一个「块」，依次由左向右排列（块首行为来源文件名）
+- 不同块（TDOS、各元素）之间空 **2 列**
+- 同一元素的 **up / dn 紧挨在一起**（中间不空列）
+
+> 导出 Excel 依赖 `openpyxl`（源码运行：`pip install openpyxl`）；便携版已内置。
+
 ### 🖼 保存当前图片
 四个曲线页面（TDOS / 元素 PDOS / 原子-轨道-PDOS / 元素-轨道-PDOS）的右栏**右下角底部**固定一个「保存当前图片」按钮（不随右栏滚动）：
 
@@ -129,7 +145,7 @@
 ```bash
 git clone https://github.com/moyulyy/plot_PDOS.git
 cd plot_PDOS
-pip install PySide6 matplotlib numpy
+pip install PySide6 matplotlib numpy openpyxl
 python pdos_viewer.py
 ```
 
@@ -301,8 +317,21 @@ PyInstaller 打包的无签名 exe 常见误报，添加信任即可；也可按
 | PySide6 | 6.x（含 QtWebEngine） |
 | matplotlib | 3.x |
 | numpy | 1.x / 2.x |
+| openpyxl | 3.x（导出 Excel，便携版已内置） |
 | 3Dmol.js | 已随仓库内置 |
 | 操作系统 | Windows 10 / 11 x64（源码运行支持 Linux / macOS） |
+
+---
+
+## 📝 更新日志
+
+### v1.1.0
+- **新增：曲线数据导出 Excel** —— 五个曲线页面（TDOS / 元素 PDOS / 原子-轨道-PDOS / 元素-轨道-PDOS / 高斯圆滑）右栏新增「导出曲线数据到 Excel」，输出「曲线信息」与「曲线数据」两张表。
+- **新增：TDOS + 元素 PDOS 汇总导出** —— 把 `Data-total/TDOS.dat` 与 `Data-element/` 下每个元素的 up / dn 放进同一张工作表：每个文件一块、依次向右排列，块之间空 **2 列**，同一元素的 **up / dn 紧挨相邻**。
+- 打包配置补充 `openpyxl` 依赖，便携版开箱即可导出 Excel。
+
+### v1.0.0
+- 首个版本：3D 晶体结构、TDOS、元素 / 原子-轨道 / 元素-轨道 PDOS、高斯圆滑，明暗主题与便携打包。
 
 ---
 
