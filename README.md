@@ -252,11 +252,47 @@ dist/PDOS-Viewer/
 
 ---
 
+## 🖥 用 Origin 绘制 DOS 图（originpro）
+
+除内置的 Matplotlib 绘图外，仓库还提供 `origin_dos_plot.py`：读取 `Data-total` / `Data-element` / `Data-atom` 的 DOS 数据，用 **Origin 的 Python 库（`originpro`）** 绘制可直接用于论文的 DOS 图。样式参考 `test/态密度.opju`。
+
+前置条件：
+
+- 已安装 **Origin 2022 或更新版本**（脚本通过其 Automation Server 通信）；
+- 运行环境已安装 `originpro`：`pip install originpro`（本项目推荐 conda 环境 `chem_env`）。
+
+```bash
+# 用 test 目录的数据出图（默认 tdos,system,eorbit）
+conda run -n chem_env python origin_dos_plot.py --root test --out test/_origin_out
+
+# 只看总态密度与合并图，并显示 Origin 界面
+conda run -n chem_env python origin_dos_plot.py --root test --pages tdos,system --show
+
+# 额外画 1、3 号原子的逐轨道 PDOS
+conda run -n chem_env python origin_dos_plot.py --root test --pages atom --atoms 1,3
+```
+
+生成的图（同时导出 PNG 与 `DOS.opju` 工程）：
+
+| 页面 | 内容 |
+| ---- | ---- |
+| `tdos` | 总态密度（上/下自旋） |
+| `system` | TDOS + 各元素 PDOS 合并图（参考 `.opju` 样式，含 d 带中心标注） |
+| `eorbit` | 每个元素的逐轨道 PDOS（s / py / … / sum_d） |
+| `atom` | 指定原子的逐轨道 PDOS（可选） |
+
+合并图与参考图一致：X 轴 `Energy (eV)`（-6~6），Y 轴 `Density of states`（自动对称取整），TDOS 灰 + 元素配色，图例每类一条，并标注 `ε_d = … eV`（取 \|d 带中心\| 最大的金属元素）。
+
+> 若 Origin 未激活（演示模式），导出图片会带有 `demo` 水印，请激活 Origin 后重新运行。
+
+---
+
 ## 🗂 项目结构
 
 ```
 plot_PDOS/
 ├── pdos_viewer.py          # 主程序（窗口、页面、绘图、算法）
+├── origin_dos_plot.py      # 用 Origin(originpro) 绘制 DOS 图（参考 test/态密度.opju）
 ├── ui_kit.py               # iOS / macOS 风格控件与 QSS 主题
 ├── 3dmol/3Dmol-min.js      # 3D 结构渲染引擎（本地，无需联网）
 ├── assets/app.ico          # 程序图标
@@ -318,6 +354,7 @@ PyInstaller 打包的无签名 exe 常见误报，添加信任即可；也可按
 | matplotlib | 3.x |
 | numpy | 1.x / 2.x |
 | openpyxl | 3.x（导出 Excel，便携版已内置） |
+| Origin / originpro | Origin 2022+ 与 `originpro`（可选，用于 `origin_dos_plot.py`） |
 | 3Dmol.js | 已随仓库内置 |
 | 操作系统 | Windows 10 / 11 x64（源码运行支持 Linux / macOS） |
 

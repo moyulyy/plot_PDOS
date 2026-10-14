@@ -48,6 +48,10 @@ PDOS · 结构分析工作台 —— Windows 便携版
 - 「高斯圆滑处理」页可把圆滑后的曲线导出为 .dat 文本
    （两列：Energy(eV) 与 quasi_dos_sigma=<σ>）。
 
+此外，源码仓库提供 origin_dos_plot.py：用 Origin 的 Python 库（originpro）
+绘制 DOS 图，样式参考 test/态密度.opju，需本机安装 Origin 2022+ 与
+originpro（pip install originpro）。详见 README 的「用 Origin 绘制 DOS 图」。
+
 默认保存目录为 exe 所在目录。
 
 四、常见问题
