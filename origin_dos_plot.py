@@ -300,6 +300,26 @@ def _nice_symmetric_limit(values, target_ticks=4):
     return limit, step
 
 
+def _resolve_ylim(values, ymin, ymax):
+    """解析 Y 轴范围，返回 (ymin, ymax, ystep)。
+
+    两者都给 → 直接用；只给一个 → 另一个由数据自动对称确定；
+    都不给 → 完全自动对称。刻度间距取与参考图一致的“好看”值。
+    """
+    lim, auto_step = _nice_symmetric_limit(values)
+    if ymin is not None and ymax is not None and ymax > ymin:
+        return ymin, ymax, _nice_step(abs(ymax - ymin))
+    # 自动对称（用户给出的值非法时也回到自动）
+    if ymin is None:
+        ymin = -lim
+    if ymax is None:
+        ymax = lim
+    if (not math.isfinite(ymin) or not math.isfinite(ymax)
+            or ymax <= ymin):
+        ymin, ymax = -lim, lim
+    return ymin, ymax, auto_step
+
+
 def _window_values(e, y):
     """取能量窗口 [XMIN, XMAX] 内的 y 值。"""
     if not e or not y:
@@ -434,11 +454,9 @@ def make_tdos_graph(op, data, out, *, ymin=None, ymax=None):
             add_curve(layer, wks, idx, TDOS_COLOR)
             idx += 1
     ystep = None
-    if ymin is None or ymax is None:
-        vals = _window_values(e, cols.get("TDOS-UP", []))
-        vals += [-v for v in _window_values(e, cols.get("TDOS-DOWN", []))]
-        lim, ystep = _nice_symmetric_limit(vals)
-        ymin, ymax = -lim, lim
+    vals = _window_values(e, cols.get("TDOS-UP", []))
+    vals += [-v for v in _window_values(e, cols.get("TDOS-DOWN", []))]
+    ymin, ymax, ystep = _resolve_ylim(vals, ymin, ymax)
     style_axes(layer, ymin=ymin, ymax=ymax, ystep=ystep)
     set_legend(layer, [("TDOS", 1)])
     return g, Path(out) / "TDOS.png"
@@ -461,6 +479,7 @@ def make_system_graph(op, data, out, *, ymin=None, ymax=None):
     wks.from_list(0, energy, lname="#Energy", units="eV", axis="X")
     col = 1
     plotted = []               # (col_index, color, ydata, group_name)
+    misaligned = set()
     if data["tdos"] and "TDOS-UP" in data["tdos"][1]:
         wks.from_list(col, list(data["tdos"][1]["TDOS-UP"]),
                       lname="TDOS-UP", units="a.u.", axis="Y")
@@ -477,10 +496,15 @@ def make_system_graph(op, data, out, *, ymin=None, ymax=None):
             pair = data["elem"][elem].get(spin)
             if not pair or not pair[0] or "tot" not in pair[1]:
                 continue
+            if not _grid_matches(pair[0], energy):
+                misaligned.add(elem)
             wks.from_list(col, list(pair[1]["tot"]),
                           lname=f"{elem}-{tag}", units="a.u.", axis="Y")
             plotted.append((col, color, pair[1]["tot"], elem))
             col += 1
+    if misaligned:
+        print(f"  [警告] 元素 {'、'.join(sorted(misaligned))} 的能量网格与 X 轴"
+              f"不一致，合并图中可能对不齐（建议各自单独绘图）")
 
     g = _new_graph(op, "System-DOS")
     layer = g[0]
@@ -496,16 +520,27 @@ def make_system_graph(op, data, out, *, ymin=None, ymax=None):
             legend_entries.append((name, i + 1))
 
     ystep = None
-    if ymin is None or ymax is None:
-        vals = []
-        for _c, _color, ydata, _name in plotted:
-            vals.extend(_window_values(energy, ydata))
-        lim, ystep = _nice_symmetric_limit(vals)
-        ymin, ymax = -lim, lim
+    vals = []
+    for _c, _color, ydata, _name in plotted:
+        vals.extend(_window_values(energy, ydata))
+    ymin, ymax, ystep = _resolve_ylim(vals, ymin, ymax)
     style_axes(layer, ymin=ymin, ymax=ymax, ystep=ystep)
     set_legend(layer, legend_entries)
     annotate_band_center(layer, _system_band_center(data), ymax)
     return g, Path(out) / "System-DOS.png"
+
+
+def _grid_matches(other, reference):
+    """判断两组能量网格是否一致（长度 + 首/中/尾）。"""
+    try:
+        if not other or len(other) != len(reference):
+            return False
+        mid = len(reference) // 2
+        return (abs(other[0] - reference[0]) < 1e-6
+                and abs(other[mid] - reference[mid]) < 1e-6
+                and abs(other[-1] - reference[-1]) < 1e-6)
+    except (TypeError, ValueError, IndexError):
+        return False
 
 
 def _system_band_center(data):
@@ -558,12 +593,10 @@ def _orbital_graph(op, entry, lname, out, png_name, *, ymin, ymax):
             legend_entries.append((name, i + 1))
     set_legend(layer, legend_entries)
     ystep = None
-    if ymin is None or ymax is None:
-        vals = []
-        for _c, _color, y, _name in handles:
-            vals.extend(_window_values(energy, y))
-        lim, ystep = _nice_symmetric_limit(vals)
-        ymin, ymax = -lim, lim
+    vals = []
+    for _c, _color, y, _name in handles:
+        vals.extend(_window_values(energy, y))
+    ymin, ymax, ystep = _resolve_ylim(vals, ymin, ymax)
     style_axes(layer, ymin=ymin, ymax=ymax, ystep=ystep)
     return g, Path(out) / png_name
 
@@ -606,6 +639,11 @@ def _save_graph(g, path, width=1200):
     try:
         path = Path(path).resolve()
         path.parent.mkdir(parents=True, exist_ok=True)
+        # 先删除旧图，避免导出失败时把旧文件误判为本次成功
+        try:
+            path.unlink()
+        except OSError:
+            pass
         try:
             g.activate()
         except Exception:
